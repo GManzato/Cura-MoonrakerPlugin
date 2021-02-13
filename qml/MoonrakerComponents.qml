@@ -14,13 +14,13 @@ Item
     id: base
 
     property bool printerConnected: Cura.MachineManager.printerOutputDevices.length != 0
-    property bool octoPrintConnected: printerConnected && Cura.MachineManager.printerOutputDevices[0].toString().indexOf("OctoPrintOutputDevice") == 0
+    property bool moonrakerConnected: printerConnected && Cura.MachineManager.printerOutputDevices[0].toString().indexOf("MoonrakerOutputDevice") == 0
 
     Button
     {
-        objectName: "openOctoPrintButton"
+        objectName: "openMoonrakerButton"
         height: UM.Theme.getSize("save_button_save_to_button").height
-        tooltip: catalog.i18nc("@info:tooltip", "Open the Fluidd web interface")
+        tooltip: catalog.i18nc("@info:tooltip", "Open Fluidd web interface")
         text: catalog.i18nc("@action:button", "Fluidd...")
         style:
         {
@@ -33,7 +33,7 @@ Item
             }
         }
         onClicked: manager.openWebPage(Cura.MachineManager.printerOutputDevices[0].baseURL)
-        visible: octoPrintConnected
+        visible: moonrakerConnected
     }
 
     UM.I18nCatalog{id: catalog; name:"cura"}

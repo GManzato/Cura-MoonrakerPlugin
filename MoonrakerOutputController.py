@@ -12,7 +12,7 @@ except ImportError:
     from cura.PrinterOutputDevice import PrinterOutputDevice, ConnectionState
     from cura.PrinterOutput.PrinterOutputModel import PrinterOutputModel
 
-class OctoPrintOutputController(GenericOutputController):
+class MoonrakerOutputController(GenericOutputController):
     def __init__(self, output_device: "PrinterOutputDevice") -> None:
         super().__init__(output_device)
 

@@ -55,7 +55,7 @@ Cura.MachineAction
     Column
     {
         anchors.fill: parent;
-        id: discoverOctoPrintAction
+        id: discoverMoonrakerAction
 
         spacing: UM.Theme.getSize("default_margin").height
         width: parent.width
@@ -233,13 +233,13 @@ Cura.MachineAction
                     CheckBox
                     {
                         id: useZeroconf
-                        text: catalog.i18nc("@label", "Automatically discover local OctoPrint instances")
-                        checked: boolCheck(UM.Preferences.getValue("octoprint/use_zeroconf"))
+                        text: catalog.i18nc("@label", "Automatically discover local Moonraker instances")
+                        checked: boolCheck(UM.Preferences.getValue("moonraker/use_zeroconf"))
                         onClicked:
                         {
-                            if(checked != boolCheck(UM.Preferences.getValue("octoprint/use_zeroconf")))
+                            if(checked != boolCheck(UM.Preferences.getValue("moonraker/use_zeroconf")))
                             {
-                                UM.Preferences.setValue("octoprint/use_zeroconf", checked);
+                                UM.Preferences.setValue("moonraker/use_zeroconf", checked);
                                 manager.startDiscovery();
                             }
                         }
@@ -289,13 +289,7 @@ Cura.MachineAction
                     {
                         width: Math.floor(parent.width * 0.75)
                         wrapMode: Text.WordWrap
-                        text: base.selectedInstance ? base.selectedInstance.octoPrintVersion : ""
-                    }
-                    Label
-                    {
-                        width: Math.floor(parent.width * 0.2)
-                        wrapMode: Text.WordWrap
-                        text: catalog.i18nc("@label", "API Key")
+                        text: base.selectedInstance ? base.selectedInstance.moonrakerVersion : ""
                     }
                     Row
                     {
@@ -332,7 +326,7 @@ Cura.MachineAction
                     {
                         width: Math.floor(parent.width * 0.75)
                         wrapMode: Text.WordWrap
-                        text: base.selectedInstance ? base.selectedInstance.octoPrintUserName : ""
+                        text: base.selectedInstance ? base.selectedInstance.moonrakerUserName : ""
                     }
 
                     Connections
@@ -400,13 +394,13 @@ Cura.MachineAction
                         var result = ""
                         if (apiKey.text == "")
                         {
-                            result = catalog.i18nc("@label", "Please enter the API key to access OctoPrint.");
+                            result = catalog.i18nc("@label", "Please enter the API key to access Moonraker.");
                         }
                         else
                         {
                             if(manager.instanceInError)
                             {
-                                return catalog.i18nc("@label", "OctoPrint is not available.")
+                                return catalog.i18nc("@label", "Moonraker is not available.")
                             }
                             if(manager.instanceResponded)
                             {
@@ -424,7 +418,7 @@ Cura.MachineAction
                                 return catalog.i18nc("@label", "Checking the API key...")
                             }
                         }
-                        result += " " + catalog.i18nc("@label", "You can get the API key through the OctoPrint web page.");
+                        result += " " + catalog.i18nc("@label", "You can get the API key through the Moonraker web page.");
                         return result;
                     }
                     width: parent.width - UM.Theme.getSize("default_margin").width
@@ -442,10 +436,10 @@ Cura.MachineAction
                         id: autoPrintCheckBox
                         text: catalog.i18nc("@label", "Start print job after uploading")
                         enabled: manager.instanceApiKeyAccepted
-                        checked: Cura.ContainerManager.getContainerMetaDataEntry(activeMachineId, "octoprint_auto_print") != "false"
+                        checked: Cura.ContainerManager.getContainerMetaDataEntry(activeMachineId, "moonraker_auto_print") != "false"
                         onClicked:
                         {
-                            manager.setContainerMetaDataEntry(activeMachineId, "octoprint_auto_print", String(checked))
+                            manager.setContainerMetaDataEntry(activeMachineId, "moonraker_auto_print", String(checked))
                         }
                     }
                     CheckBox
@@ -453,10 +447,10 @@ Cura.MachineAction
                         id: autoSelectCheckBox
                         text: catalog.i18nc("@label", "Select print job after uploading")
                         enabled: manager.instanceApiKeyAccepted && !autoPrintCheckBox.checked
-                        checked: Cura.ContainerManager.getContainerMetaDataEntry(activeMachineId, "octoprint_auto_select") == "true"
+                        checked: Cura.ContainerManager.getContainerMetaDataEntry(activeMachineId, "moonraker_auto_select") == "true"
                         onClicked:
                         {
-                            manager.setContainerMetaDataEntry(activeMachineId, "octoprint_auto_select", String(checked))
+                            manager.setContainerMetaDataEntry(activeMachineId, "moonraker_auto_select", String(checked))
                         }
                     }
                     Row
@@ -470,10 +464,10 @@ Cura.MachineAction
                             visible: autoPowerControlPlugs.visible
                             enabled: autoPrintCheckBox.checked
                             anchors.verticalCenter: autoPowerControlPlugs.verticalCenter
-                            checked: manager.instanceApiKeyAccepted && Cura.ContainerManager.getContainerMetaDataEntry(activeMachineId, "octoprint_power_control") == "true"
+                            checked: manager.instanceApiKeyAccepted && Cura.ContainerManager.getContainerMetaDataEntry(activeMachineId, "moonraker_power_control") == "true"
                             onClicked:
                             {
-                                manager.setContainerMetaDataEntry(activeMachineId, "octoprint_power_control", String(checked))
+                                manager.setContainerMetaDataEntry(activeMachineId, "moonraker_power_control", String(checked))
                             }
                         }
                         Connections
@@ -503,11 +497,11 @@ Cura.MachineAction
                                     var current_index = -1;
 
                                     var power_plugs = manager.instanceAvailablePowerPlugins;
-                                    var current_key = Cura.ContainerManager.getContainerMetaDataEntry(activeMachineId, "octoprint_power_plug");
+                                    var current_key = Cura.ContainerManager.getContainerMetaDataEntry(activeMachineId, "moonraker_power_plug");
                                     if (current_key == "" && power_plugs.length > 0)
                                     {
                                         current_key = power_plugs[0].key;
-                                        manager.setContainerMetaDataEntry(activeMachineId, "octoprint_power_plug", current_key);
+                                        manager.setContainerMetaDataEntry(activeMachineId, "moonraker_power_plug", current_key);
                                     }
 
                                     for(var i in power_plugs)
@@ -538,7 +532,7 @@ Cura.MachineAction
                             {
                                 if(!populatingModel && model.get(index))
                                 {
-                                    manager.setContainerMetaDataEntry(activeMachineId, "octoprint_power_plug", model.get(index).key);
+                                    manager.setContainerMetaDataEntry(activeMachineId, "moonraker_power_plug", model.get(index).key);
                                 }
                             }
 
@@ -549,10 +543,10 @@ Cura.MachineAction
                         id: autoConnectCheckBox
                         text: catalog.i18nc("@label", "Connect to printer before sending printjob")
                         enabled: manager.instanceApiKeyAccepted && autoPrintCheckBox.checked && !autoPowerControlCheckBox.checked
-                        checked: enabled && Cura.ContainerManager.getContainerMetaDataEntry(activeMachineId, "octoprint_auto_connect") == "true"
+                        checked: enabled && Cura.ContainerManager.getContainerMetaDataEntry(activeMachineId, "moonraker_auto_connect") == "true"
                         onClicked:
                         {
-                            manager.setContainerMetaDataEntry(activeMachineId, "octoprint_auto_connect", String(checked))
+                            manager.setContainerMetaDataEntry(activeMachineId, "moonraker_auto_connect", String(checked))
                         }
                     }
                     CheckBox
@@ -560,10 +554,10 @@ Cura.MachineAction
                         id: showCameraCheckBox
                         text: catalog.i18nc("@label", "Show webcam image")
                         enabled: manager.instanceSupportsCamera
-                        checked: manager.instanceApiKeyAccepted && Cura.ContainerManager.getContainerMetaDataEntry(activeMachineId, "octoprint_show_camera") != "false"
+                        checked: manager.instanceApiKeyAccepted && Cura.ContainerManager.getContainerMetaDataEntry(activeMachineId, "moonraker_show_camera") != "false"
                         onClicked:
                         {
-                            manager.setContainerMetaDataEntry(activeMachineId, "octoprint_show_camera", String(checked))
+                            manager.setContainerMetaDataEntry(activeMachineId, "moonraker_show_camera", String(checked))
                         }
                     }
                     CheckBox
@@ -571,10 +565,10 @@ Cura.MachineAction
                         id: storeOnSdCheckBox
                         text: catalog.i18nc("@label", "Store G-code on the printer SD card")
                         enabled: manager.instanceSupportsSd
-                        checked: manager.instanceApiKeyAccepted && Cura.ContainerManager.getContainerMetaDataEntry(activeMachineId, "octoprint_store_sd") == "true"
+                        checked: manager.instanceApiKeyAccepted && Cura.ContainerManager.getContainerMetaDataEntry(activeMachineId, "moonraker_store_sd") == "true"
                         onClicked:
                         {
-                            manager.setContainerMetaDataEntry(activeMachineId, "octoprint_store_sd", String(checked))
+                            manager.setContainerMetaDataEntry(activeMachineId, "moonraker_store_sd", String(checked))
                         }
                     }
                     Label
@@ -593,7 +587,7 @@ Cura.MachineAction
                     }
                     Label
                     {
-                        text: catalog.i18nc("@label", "Note: Printing UltiGCode using OctoPrint does not work. Setting Gcode flavor to \"Marlin\" fixes this, but overrides material settings on your printer.")
+                        text: catalog.i18nc("@label", "Note: Printing UltiGCode using Moonraker does not work. Setting Gcode flavor to \"Marlin\" fixes this, but overrides material settings on your printer.")
                         width: parent.width - UM.Theme.getSize("default_margin").width
                         wrapMode: Text.WordWrap
                         visible: fixGcodeFlavor.visible
@@ -624,16 +618,15 @@ Cura.MachineAction
                             }
                             return  catalog.i18nc("@action:button", "Connect")
                         }
-                        enabled: base.selectedInstance !== null && apiKey.text != "" && manager.instanceApiKeyAccepted
+                        enabled: base.selectedInstance !== null
                         onClicked:
                         {
-                            if(base.selectedInstance.getId() == manager.instanceId && manager.instanceApiKeyAccepted) {
+                            if(base.selectedInstance.getId() == manager.instanceId) {
                                 manager.setInstanceId("")
                             }
                             else
                             {
                                 manager.setInstanceId(base.selectedInstance.getId())
-                                manager.setApiKey(apiKey.text)
 
                                 if(fixGcodeFlavor.visible)
                                 {
@@ -669,7 +662,7 @@ Cura.MachineAction
         property alias userNameText: userNameField.text
         property alias passwordText: passwordField.text
 
-        title: catalog.i18nc("@title:window", "Manually added OctoPrint instance")
+        title: catalog.i18nc("@title:window", "Manually added Moonraker instance")
 
         minimumWidth: 400 * screenScaleFactor
         minimumHeight: (showAdvancedOptions.checked ? 280 : 160) * screenScaleFactor
@@ -861,7 +854,7 @@ Cura.MachineAction
                 visible: showAdvancedOptions.checked
                 wrapMode: Text.WordWrap
                 width: parent.width
-                text: catalog.i18nc("@label","NB: Only use these options if you access OctoPrint through a reverse proxy.")
+                text: catalog.i18nc("@label","NB: Only use these options if you access Moonraker through a reverse proxy.")
             }
         }
 

@@ -2,7 +2,7 @@
 # OctoPrintPlugin is released under the terms of the AGPLv3 or higher.
 
 from UM.OutputDevice.OutputDevicePlugin import OutputDevicePlugin
-from .OctoPrintOutputDevice import OctoPrintOutputDevice
+from .MoonrakerOutputDevice import MoonrakerOutputDevice
 
 from UM.Signal import Signal, signalemitter
 from UM.Application import Application
@@ -55,16 +55,16 @@ else:
 if TYPE_CHECKING:
     from cura.PrinterOutput.PrinterOutputModel import PrinterOutputModel
 
-##  This plugin handles the connection detection & creation of output device objects for OctoPrint-connected printers.
+##  This plugin handles the connection detection & creation of output device objects for Moonraker-connected printers.
 #   Zero-Conf is used to detect printers, which are saved in a dict.
 #   If we discover an instance that has the same key as the active machine instance a connection is made.
 @signalemitter
-class OctoPrintOutputDevicePlugin(OutputDevicePlugin):
+class MoonrakerOutputDevicePlugin(OutputDevicePlugin):
     def __init__(self) -> None:
         super().__init__()
         self._zero_conf = None # type: Optional[Zeroconf]
         self._browser = None # type: Optional[ServiceBrowser]
-        self._instances = {} # type: Dict[str, OctoPrintOutputDevice]
+        self._instances = {} # type: Dict[str, MoonrakerOutputDevice]
 
         # Because the model needs to be created in the same thread as the QMLEngine, we use a signal.
         self.addInstanceSignal.connect(self.addInstance)
@@ -73,18 +73,18 @@ class OctoPrintOutputDevicePlugin(OutputDevicePlugin):
 
         # Load custom instances from preferences
         self._preferences = Application.getInstance().getPreferences()
-        self._preferences.addPreference("octoprint/manual_instances", "{}")
+        self._preferences.addPreference("moonraker/manual_instances", "{}")
 
-        self._preferences.addPreference("octoprint/use_zeroconf", True)
+        self._preferences.addPreference("moonraker/use_zeroconf", True)
 
         try:
-            self._manual_instances = json.loads(self._preferences.getValue("octoprint/manual_instances"))
+            self._manual_instances = json.loads(self._preferences.getValue("moonraker/manual_instances"))
         except ValueError:
             self._manual_instances = {} # type: Dict[str, Any]
         if not isinstance(self._manual_instances, dict):
             self._manual_instances = {} # type: Dict[str, Any]
 
-        self._name_regex = re.compile("OctoPrint instance (\".*\"\.|on )(.*)\.")
+        self._name_regex = re.compile("Moonraker instance (\".*\"\.|on )(.*)\.")
 
         self._keep_alive_timer = QTimer()
         self._keep_alive_timer.setInterval(2000)
@@ -130,7 +130,7 @@ class OctoPrintOutputDevicePlugin(OutputDevicePlugin):
         self.instanceListChanged.emit()
 
         # Don't start zeroconf discovery if it is disabled
-        if not self._preferences.getValue("octoprint/use_zeroconf"):
+        if not self._preferences.getValue("moonraker/use_zeroconf"):
             self._keep_alive_timer.stop()
             return
 
@@ -142,7 +142,7 @@ class OctoPrintOutputDevicePlugin(OutputDevicePlugin):
             Logger.logException("e", "Failed to create Zeroconf instance. Auto-discovery will not work.")
 
         if self._zero_conf:
-            self._browser = ServiceBrowser(self._zero_conf, u'_octoprint._tcp.local.', [self._onServiceChanged])
+            self._browser = ServiceBrowser(self._zero_conf, u'_moonraker._tcp.local.', [self._onServiceChanged])
             if self._browser and self._browser.is_alive():
                 self._keep_alive_timer.start()
             else:
@@ -152,7 +152,7 @@ class OctoPrintOutputDevicePlugin(OutputDevicePlugin):
     def _keepDiscoveryAlive(self) -> None:
         if not self._browser or not self._browser.is_alive():
             if self._consecutive_zeroconf_restarts < 5:
-                Logger.log("w", "Zeroconf discovery has died, restarting discovery of OctoPrint instances.")
+                Logger.log("w", "Zeroconf discovery has died, restarting discovery of Moonraker instances.")
                 self._consecutive_zeroconf_restarts += 1
                 self.startDiscovery()
             else:
@@ -174,7 +174,7 @@ class OctoPrintOutputDevicePlugin(OutputDevicePlugin):
             "userName": userName,
             "password": password
         }
-        self._preferences.setValue("octoprint/manual_instances", json.dumps(self._manual_instances))
+        self._preferences.setValue("moonraker/manual_instances", json.dumps(self._manual_instances))
 
         properties = {
             b"path": path.encode("utf-8"),
@@ -197,7 +197,7 @@ class OctoPrintOutputDevicePlugin(OutputDevicePlugin):
 
         if name in self._manual_instances:
             self._manual_instances.pop(name, None)
-            self._preferences.setValue("octoprint/manual_instances", json.dumps(self._manual_instances))
+            self._preferences.setValue("moonraker/manual_instances", json.dumps(self._manual_instances))
 
     ##  Stop looking for devices on network.
     def stop(self) -> None:
@@ -213,7 +213,7 @@ class OctoPrintOutputDevicePlugin(OutputDevicePlugin):
     def getInstances(self) -> Dict[str, Any]:
         return self._instances
 
-    def getInstanceById(self, instance_id: str) -> Optional[OctoPrintOutputDevice]:
+    def getInstanceById(self, instance_id: str) -> Optional[MoonrakerOutputDevice]:
         instance = self._instances.get(instance_id, None)
         if instance:
             return instance
@@ -226,11 +226,11 @@ class OctoPrintOutputDevicePlugin(OutputDevicePlugin):
             return
 
         for key in self._instances:
-            if key == global_container_stack.getMetaDataEntry("octoprint_id"):
-                api_key = global_container_stack.getMetaDataEntry("octoprint_api_key", "")
+            if key == global_container_stack.getMetaDataEntry("moonraker_id"):
+                api_key = global_container_stack.getMetaDataEntry("moonraker_api_key", "")
                 self._instances[key].setApiKey(self._deobfuscateString(api_key))
                 self._instances[key].setShowCamera(parseBool(
-                    global_container_stack.getMetaDataEntry("octoprint_show_camera", "true"))
+                    global_container_stack.getMetaDataEntry("moonraker_show_camera", "true"))
                 )
                 self._instances[key].connectionStateChanged.connect(self._onInstanceConnectionStateChanged)
                 self._instances[key].connect()
@@ -240,13 +240,13 @@ class OctoPrintOutputDevicePlugin(OutputDevicePlugin):
 
     ##  Because the model needs to be created in the same thread as the QMLEngine, we use a signal.
     def addInstance(self, name: str, address: str, port: int, properties: Dict[bytes, bytes]) -> None:
-        instance = OctoPrintOutputDevice(name, address, port, properties)
+        instance = MoonrakerOutputDevice(name, address, port, properties)
         self._instances[instance.getId()] = instance
         global_container_stack = Application.getInstance().getGlobalContainerStack()
-        if global_container_stack and instance.getId() == global_container_stack.getMetaDataEntry("octoprint_id"):
-            api_key = global_container_stack.getMetaDataEntry("octoprint_api_key", "")
+        if global_container_stack and instance.getId() == global_container_stack.getMetaDataEntry("moonraker_id"):
+            api_key = global_container_stack.getMetaDataEntry("moonraker_api_key", "")
             instance.setApiKey(self._deobfuscateString(api_key))
-            instance.setShowCamera(parseBool(global_container_stack.getMetaDataEntry("octoprint_show_camera", "true")))
+            instance.setShowCamera(parseBool(global_container_stack.getMetaDataEntry("moonraker_show_camera", "true")))
             instance.connectionStateChanged.connect(self._onInstanceConnectionStateChanged)
             instance.connect()
 

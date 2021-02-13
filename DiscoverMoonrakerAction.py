@@ -18,8 +18,8 @@ from PyQt5.QtNetwork import QNetworkRequest, QNetworkAccessManager, QNetworkRepl
 
 from .NetworkReplyTimeout import NetworkReplyTimeout
 from .PowerPlugins import PowerPlugins
-from .OctoPrintOutputDevicePlugin import OctoPrintOutputDevicePlugin
-from .OctoPrintOutputDevice import OctoPrintOutputDevice
+from .MoonrakerOutputDevicePlugin import MoonrakerOutputDevicePlugin
+from .MoonrakerOutputDevice import MoonrakerOutputDevice
 
 import os.path
 import json
@@ -31,14 +31,14 @@ if TYPE_CHECKING:
 
 catalog = i18nCatalog("cura")
 
-class DiscoverOctoPrintAction(MachineAction):
+class DiscoverMoonrakerAction(MachineAction):
     def __init__(self, parent: QObject = None) -> None:
-        super().__init__("DiscoverOctoPrintAction", catalog.i18nc("@action", "Connect Moonraker"))
+        super().__init__("DiscoverMoonrakerAction", catalog.i18nc("@action", "Connect Moonraker"))
 
-        self._qml_url = os.path.join("qml", "DiscoverOctoPrintAction.qml")
+        self._qml_url = os.path.join("qml", "DiscoverMoonrakerAction.qml")
 
         self._application = CuraApplication.getInstance()
-        self._network_plugin = None # type: Optional[OctoPrintOutputDevicePlugin]
+        self._network_plugin = None # type: Optional[MoonrakerOutputDevicePlugin]
 
         #   QNetwork manager needs to be created in advance. If we don't it can happen that it doesn't correctly
         #   hook itself into the event loop, which results in events never being fired / done.
@@ -72,11 +72,11 @@ class DiscoverOctoPrintAction(MachineAction):
         self._user_agent = ("%s/%s %s/%s" % (
             self._application.getApplicationName(),
             self._application.getVersion(),
-            "OctoPrintPlugin",
+            "MoonrakerPlugin",
             self._plugin_version
         )).encode()
 
-        self._settings_instance = None  # type: Optional[OctoPrintOutputDevice]
+        self._settings_instance = None  # type: Optional[MoonrakerOutputDevice]
 
         self._instance_responded = False
         self._instance_in_error = False
@@ -89,11 +89,11 @@ class DiscoverOctoPrintAction(MachineAction):
 
         # Load keys cache from preferences
         self._preferences = self._application.getPreferences()
-        self._preferences.addPreference("octoprint/keys_cache", "")
+        self._preferences.addPreference("moonraker/keys_cache", "")
 
         try:
             self._keys_cache = json.loads(
-                self._deobfuscateString(self._preferences.getValue("octoprint/keys_cache"))
+                self._deobfuscateString(self._preferences.getValue("moonraker/keys_cache"))
             )
         except ValueError:
             self._keys_cache = {} # type: Dict[str, Any]
@@ -114,7 +114,7 @@ class DiscoverOctoPrintAction(MachineAction):
         if not self._plugin_id:
             return
         if not self._network_plugin:
-            self._network_plugin = cast(OctoPrintOutputDevicePlugin, self._application.getOutputDeviceManager().getOutputDevicePlugin(self._plugin_id))
+            self._network_plugin = cast(MoonrakerOutputDevicePlugin, self._application.getOutputDeviceManager().getOutputDevicePlugin(self._plugin_id))
             if not self._network_plugin:
                 return
             self._network_plugin.addInstanceSignal.connect(self._onInstanceDiscovery)
@@ -174,7 +174,7 @@ class DiscoverOctoPrintAction(MachineAction):
     def setInstanceId(self, key: str) -> None:
         global_container_stack = self._application.getGlobalContainerStack()
         if global_container_stack:
-            global_container_stack.setMetaDataEntry("octoprint_id", key)
+            global_container_stack.setMetaDataEntry("moonraker_id", key)
 
         if self._network_plugin:
             # Ensure that the connection states are refreshed.
@@ -188,7 +188,7 @@ class DiscoverOctoPrintAction(MachineAction):
         if not global_container_stack:
             return ""
 
-        return global_container_stack.getMetaDataEntry("octoprint_id", "")
+        return global_container_stack.getMetaDataEntry("moonraker_id", "")
 
     @pyqtSlot(str)
     def requestApiKey(self, instance_id: str) -> None:
@@ -260,7 +260,7 @@ class DiscoverOctoPrintAction(MachineAction):
             self._settings_reply_timeout = None
 
         if api_key != "":
-            Logger.log("d", "Trying to access OctoPrint instance at %s with the provided API key." % base_url)
+            Logger.log("d", "Trying to access Moonraker instance at %s with the provided API key." % base_url)
 
             ## Request 'settings' dump
             settings_request = self._createRequest(
@@ -282,7 +282,7 @@ class DiscoverOctoPrintAction(MachineAction):
             return
 
         global_container_stack.setMetaDataEntry(
-            "octoprint_api_key",
+            "moonraker_api_key",
             base64.b64encode(api_key.encode("ascii")).decode("ascii")
         )
 
@@ -290,7 +290,7 @@ class DiscoverOctoPrintAction(MachineAction):
         keys_cache = base64.b64encode(
             json.dumps(self._keys_cache).encode("ascii")
         ).decode("ascii")
-        self._preferences.setValue("octoprint/keys_cache", keys_cache)
+        self._preferences.setValue("moonraker/keys_cache", keys_cache)
 
         if self._network_plugin:
             # Ensure that the connection states are refreshed.
@@ -306,7 +306,7 @@ class DiscoverOctoPrintAction(MachineAction):
 
         if instance_id == self.instanceId:
             api_key = self._deobfuscateString(
-                global_container_stack.getMetaDataEntry("octoprint_api_key", "")
+                global_container_stack.getMetaDataEntry("moonraker_api_key", "")
             )
         else:
             api_key = self._keys_cache.get(instance_id, "")
@@ -423,23 +423,23 @@ class DiscoverOctoPrintAction(MachineAction):
         QDesktopServices.openUrl(QUrl(url))
 
     def _createAdditionalComponentsView(self) -> None:
-        Logger.log("d", "Creating additional ui components for OctoPrint-connected printers.")
+        Logger.log("d", "Creating additional ui components for Moonraker-connected printers.")
 
-        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "qml", "OctoPrintComponents.qml")
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "qml", "MoonrakerComponents.qml")
         self._additional_components = self._application.createQmlComponent(path, {"manager": self})
         if not self._additional_components:
-            Logger.log("w", "Could not create additional components for OctoPrint-connected printers.")
+            Logger.log("w", "Could not create additional components for Moonraker-connected printers.")
             return
 
         self._application.addAdditionalComponent(
             "monitorButtons",
-            self._additional_components.findChild(QObject, "openOctoPrintButton")
+            self._additional_components.findChild(QObject, "openMoonrakerButton")
         )
 
     def _onRequestFailed(self, reply: QNetworkReply) -> None:
         if reply.operation() == QNetworkAccessManager.GetOperation:
-            if "api/settings" in reply.url().toString():  # OctoPrint settings dump from /settings:
-                Logger.log("w", "Connection refused or timeout when trying to access OctoPrint at %s" % reply.url().toString())
+            if "api/settings" in reply.url().toString():  # Moonraker settings dump from /settings:
+                Logger.log("w", "Connection refused or timeout when trying to access Moonraker at %s" % reply.url().toString())
                 self._instance_in_error = True
                 self.selectedInstanceSettingsChanged.emit()
 
@@ -462,11 +462,11 @@ class DiscoverOctoPrintAction(MachineAction):
                     self._appkey_request.setRawHeader(b"Content-Type", b"")
                     self._appkey_poll_timer.start()
                 elif http_status_code == 404:
-                    Logger.log("w", "This instance of OctoPrint does not support AppKeys")
+                    Logger.log("w", "This instance of Moonraker does not support AppKeys")
                     self._appkey_request = None # type: Optional[QNetworkRequest]
                 else:
                     response = bytes(reply.readAll()).decode()
-                    Logger.log("w", "Unknown response when requesting an AppKey: %d. OctoPrint said %s" % (http_status_code, response))
+                    Logger.log("w", "Unknown response when requesting an AppKey: %d. Moonraker said %s" % (http_status_code, response))
                     self._appkey_request = None # type: Optional[QNetworkRequest]
 
         if reply.operation() == QNetworkAccessManager.GetOperation:
@@ -485,7 +485,7 @@ class DiscoverOctoPrintAction(MachineAction):
                     try:
                         json_data = json.loads(bytes(reply.readAll()).decode("utf-8"))
                     except json.decoder.JSONDecodeError:
-                        Logger.log("w", "Received invalid JSON from octoprint instance.")
+                        Logger.log("w", "Received invalid JSON from moonraker instance.")
 
                     if json_data:
                         api_key = json_data["api_key"]
@@ -496,22 +496,22 @@ class DiscoverOctoPrintAction(MachineAction):
                     Logger.log("d", "AppKey denied")
                 else:
                     response = bytes(reply.readAll()).decode()
-                    Logger.log("w", "Unknown response when waiting for an AppKey: %d. OctoPrint said %s" % (http_status_code, response))
+                    Logger.log("w", "Unknown response when waiting for an AppKey: %d. Moonraker said %s" % (http_status_code, response))
 
                 if http_status_code != 202:
                     self._appkey_request = None # type: Optional[QNetworkRequest]
 
-            if "printer/info" in reply.url().toString():  # OctoPrint settings dump from /settings:
+            if "printer/info" in reply.url().toString():  # Moonraker settings dump from /settings:
                 self._instance_in_error = False
 
                 if http_status_code == 200:
-                    Logger.log("d", "API key accepted by OctoPrint.")
+                    Logger.log("d", "API key accepted by Moonraker.")
                     self._instance_api_key_accepted = True
 
                     try:
                         json_data = json.loads(bytes(reply.readAll()).decode("utf-8"))
                     except json.decoder.JSONDecodeError:
-                        Logger.log("w", "Received invalid JSON from octoprint instance.")
+                        Logger.log("w", "Received invalid JSON from moonraker instance.")
                         json_data = {}
 
                     if "feature" in json_data and "sdSupport" in json_data["feature"]:
@@ -533,18 +533,18 @@ class DiscoverOctoPrintAction(MachineAction):
                         if self._settings_instance.getId() == self.instanceId:
                             self.setApiKey(api_key)
 
-                        self._settings_instance.resetOctoPrintUserName()
+                        self._settings_instance.resetMoonrakerUserName()
                         self._settings_instance.getAdditionalData()
                         self._settings_instance.parseSettingsData(json_data)
 
                     self._settings_instance = None
 
                 elif http_status_code == 401:
-                    Logger.log("d", "Invalid API key for OctoPrint.")
+                    Logger.log("d", "Invalid API key for Moonraker.")
                     self._instance_api_key_accepted = False
 
                 elif http_status_code == 502 or http_status_code == 503:
-                    Logger.log("d", "OctoPrint is not running.")
+                    Logger.log("d", "Moonraker is not running.")
                     self._instance_api_key_accepted = False
                     self._instance_in_error = True
 
@@ -574,7 +574,7 @@ class DiscoverOctoPrintAction(MachineAction):
         except UnicodeDecodeError:
             return source
 
-    def _getInstanceInfo(self, instance_id: str) -> Tuple[Optional[OctoPrintOutputDevice], str, str, str]:
+    def _getInstanceInfo(self, instance_id: str) -> Tuple[Optional[MoonrakerOutputDevice], str, str, str]:
         if not self._network_plugin:
             return (None, "","","")
         instance = self._network_plugin.getInstanceById(instance_id)

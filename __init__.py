@@ -3,8 +3,8 @@
 
 import os, json
 
-from . import OctoPrintOutputDevicePlugin
-from . import DiscoverOctoPrintAction
+from . import MoonrakerOutputDevicePlugin
+from . import DiscoverMoonrakerAction
 from . import NetworkMJPGImage
 
 from UM.Version import Version
@@ -20,6 +20,6 @@ def register(app):
     qmlRegisterType(NetworkMJPGImage.NetworkMJPGImage, "MoonrakerPrintPlugin", 1, 0, "NetworkMJPGImage")
 
     return {
-        "output_device": OctoPrintOutputDevicePlugin.OctoPrintOutputDevicePlugin(),
-        "machine_action": DiscoverOctoPrintAction.DiscoverOctoPrintAction()
+        "output_device": MoonrakerOutputDevicePlugin.MoonrakerOutputDevicePlugin(),
+        "machine_action": DiscoverMoonrakerAction.DiscoverMoonrakerAction()
     }

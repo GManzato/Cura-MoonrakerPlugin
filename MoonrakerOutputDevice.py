@@ -13,7 +13,7 @@ from UM.PluginError import PluginNotFoundError
 
 from cura.CuraApplication import CuraApplication
 
-from .OctoPrintOutputController import OctoPrintOutputController
+from .MoonrakerOutputController import MoonrakerOutputController
 from .PowerPlugins import PowerPlugins
 from .WebcamsModel import WebcamsModel
 
@@ -70,9 +70,9 @@ class UnifiedConnectionState(IntEnum):
 
 AxisInformation = namedtuple("AxisInformation", ["speed", "inverted"])
 
-##  OctoPrint connected (wifi / lan) printer using the OctoPrint API
+##  Moonraker connected (wifi / lan) printer using the Moonraker API
 @signalemitter
-class OctoPrintOutputDevice(NetworkedPrinterOutputDevice):
+class MoonrakerOutputDevice(NetworkedPrinterOutputDevice):
     def __init__(self, instance_id: str, address: str, port: int, properties: dict, **kwargs) -> None:
         super().__init__(device_id = instance_id, address = address, properties = properties, **kwargs)
 
@@ -87,8 +87,8 @@ class OctoPrintOutputDevice(NetworkedPrinterOutputDevice):
         self._printer_model = ""
         self._printer_name = ""
 
-        self._octoprint_version = self._properties.get(b"version", b"").decode("utf-8")
-        self._octoprint_user_name = ""
+        self._moonraker_version = self._properties.get(b"version", b"").decode("utf-8")
+        self._moonraker_user_name = ""
 
         self._axis_information = {axis: AxisInformation(speed=6000 if axis != "e" else 300, inverted=False) for axis in ["x", "y", "z", "e"]}
 
@@ -99,7 +99,7 @@ class OctoPrintOutputDevice(NetworkedPrinterOutputDevice):
         self._forced_queue = False
         self._select_and_print_handled_in_upload = False
 
-        # We start with a single extruder, but update this when we get data from octoprint
+        # We start with a single extruder, but update this when we get data from moonraker
         self._number_of_extruders_set = False
         self._number_of_extruders = 1
 
@@ -117,7 +117,7 @@ class OctoPrintOutputDevice(NetworkedPrinterOutputDevice):
         self._user_agent = ("%s/%s %s/%s" % (
             CuraApplication.getInstance().getApplicationName(),
             CuraApplication.getInstance().getVersion(),
-            "OctoPrintPlugin",
+            "MoonrakerPlugin",
             plugin_version
         )) # NetworkedPrinterOutputDevice defines this as string, so we encode this later
 
@@ -152,16 +152,16 @@ class OctoPrintOutputDevice(NetworkedPrinterOutputDevice):
             self._monitor_view_qml_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "qml", "MonitorItem4x.qml")
 
         name = self._id
-        matches = re.search(r"^\"(.*)\"\._octoprint\._tcp.local$", name)
+        matches = re.search(r"^\"(.*)\"\._moonraker\._tcp.local$", name)
         if matches:
             name = matches.group(1)
 
         self.setPriority(2) # Make sure the output device gets selected above local file output
         self.setName(name)
-        self.setShortDescription(i18n_catalog.i18nc("@action:button", "Print with OctoPrint"))
-        self.setDescription(i18n_catalog.i18nc("@properties:tooltip", "Print with OctoPrint"))
+        self.setShortDescription(i18n_catalog.i18nc("@action:button", "Print with Moonraker"))
+        self.setDescription(i18n_catalog.i18nc("@properties:tooltip", "Print with Moonraker"))
         self.setIconName("print")
-        self.setConnectionText(i18n_catalog.i18nc("@info:status", "Connected to OctoPrint on {0}").format(self._id))
+        self.setConnectionText(i18n_catalog.i18nc("@info:status", "Connected to Moonraker on {0}").format(self._id))
 
         self._post_gcode_reply = None
 
@@ -194,15 +194,15 @@ class OctoPrintOutputDevice(NetworkedPrinterOutputDevice):
         self._waiting_for_analysis = False
         self._waiting_for_printer = False
 
-        self._output_controller = OctoPrintOutputController(self)
+        self._output_controller = MoonrakerOutputController(self)
 
-        self._polling_end_points = ["printer/objects/query?webhooks&virtual_sdcard&print_stats"]
+        self._polling_end_points = ["printer/objects/query?heaters&virtual_sdcard&print_stats&display_status&toolhead"]
 
     @property
     def _store_on_sd(self) -> bool:
         global_container_stack = CuraApplication.getInstance().getGlobalContainerStack()
         if global_container_stack:
-            return self._store_on_sd_supported and parseBool(global_container_stack.getMetaDataEntry("octoprint_store_sd", False))
+            return self._store_on_sd_supported and parseBool(global_container_stack.getMetaDataEntry("moonraker_store_sd", False))
         return False
 
     @property
@@ -230,7 +230,7 @@ class OctoPrintOutputDevice(NetworkedPrinterOutputDevice):
     def getId(self) -> str:
         return self._id
 
-    ##  Set the API key of this OctoPrint instance
+    ##  Set the API key of this Moonraker instance
     def setApiKey(self, api_key: str) -> None:
         self._api_key = api_key.encode()
 
@@ -243,15 +243,15 @@ class OctoPrintOutputDevice(NetworkedPrinterOutputDevice):
 
     ##  Version (as returned from the zeroConf properties or from /api/version)
     @pyqtProperty(str, notify=additionalDataChanged)
-    def octoPrintVersion(self) -> str:
-        return self._octoprint_version
+    def moonrakerVersion(self) -> str:
+        return self._moonraker_version
 
     @pyqtProperty(str, notify=additionalDataChanged)
-    def octoPrintUserName(self) -> str:
-        return self._octoprint_user_name
+    def moonrakerUserName(self) -> str:
+        return self._moonraker_user_name
 
-    def resetOctoPrintUserName(self) -> None:
-        self._octoprint_user_name = ""
+    def resetMoonrakerUserName(self) -> None:
+        self._moonraker_user_name = ""
 
     @pyqtProperty(str, notify=additionalDataChanged)
     def printerName(self) -> str:
@@ -270,12 +270,12 @@ class OctoPrintOutputDevice(NetworkedPrinterOutputDevice):
         return self._address
 
     ## IPadress of this instance
-    #  Overridden from NetworkedPrinterOutputDevice because OctoPrint does not
+    #  Overridden from NetworkedPrinterOutputDevice because Moonraker does not
     #  send the ip address with zeroconf
     @pyqtProperty(str, notify=additionalDataChanged)
     def address(self) -> str:
-        if self._octoprint_user_name:
-            return "%s@%s" % (self._octoprint_user_name, self._address)
+        if self._moonraker_user_name:
+            return "%s@%s" % (self._moonraker_user_name, self._address)
         else:
             return self._address
 
@@ -343,7 +343,7 @@ class OctoPrintOutputDevice(NetworkedPrinterOutputDevice):
 
         self._last_response_time = None  # type: Optional[float]
         self._setAcceptsCommands(False)
-        self.setConnectionText(i18n_catalog.i18nc("@info:status", "Connecting to OctoPrint on {0}").format(self._id))
+        self.setConnectionText(i18n_catalog.i18nc("@info:status", "Connecting to Moonraker on {0}").format(self._id))
 
         ## Request 'settings' dump
         self.get("settings", self._onRequestFinished)
@@ -354,10 +354,10 @@ class OctoPrintOutputDevice(NetworkedPrinterOutputDevice):
         if not self._api_key:
             return
 
-        if not self._octoprint_version:
+        if not self._moonraker_version:
             self.get("version", self._onRequestFinished)
 
-        if not self._octoprint_user_name and self._api_key:
+        if not self._moonraker_user_name and self._api_key:
             self._sendCommandToApi("login", {"passive":True})
 
         self.get("printerprofiles", self._onRequestFinished)
@@ -416,17 +416,17 @@ class OctoPrintOutputDevice(NetworkedPrinterOutputDevice):
             self._progress_message.hide()
             self._progress_message = None # type: Optional[Message]
 
-        self._auto_print = parseBool(global_container_stack.getMetaDataEntry("octoprint_auto_print", True))
-        self._auto_select = parseBool(global_container_stack.getMetaDataEntry("octoprint_auto_select", False))
+        self._auto_print = parseBool(global_container_stack.getMetaDataEntry("moonraker_auto_print", True))
+        self._auto_select = parseBool(global_container_stack.getMetaDataEntry("moonraker_auto_select", False))
         self._forced_queue = False
 
-        use_power_plugin = parseBool(global_container_stack.getMetaDataEntry("octoprint_power_control", False))
-        auto_connect = parseBool(global_container_stack.getMetaDataEntry("octoprint_auto_connect", False))
+        use_power_plugin = parseBool(global_container_stack.getMetaDataEntry("moonraker_power_control", False))
+        auto_connect = parseBool(global_container_stack.getMetaDataEntry("moonraker_auto_connect", False))
         if self.activePrinter.state == "offline" and self._auto_print and (use_power_plugin or auto_connect):
             wait_for_printer = False
             if use_power_plugin:
                 available_plugs = self._power_plugins_manager.getAvailablePowerPlugs()
-                power_plug_id = global_container_stack.getMetaDataEntry("octoprint_power_plug", "")
+                power_plug_id = global_container_stack.getMetaDataEntry("moonraker_power_plug", "")
                 if power_plug_id == "" and len(available_plugs) > 0:
                     power_plug_id = list(self._power_plugins_manager.getAvailablePowerPlugs().keys())[0]
 
@@ -443,14 +443,14 @@ class OctoPrintOutputDevice(NetworkedPrinterOutputDevice):
 
             else: # auto_connect
                 self._sendCommandToApi("connection", "connect")
-                Logger.log("d", "Sent command to connect printer to OctoPrint with current settings")
+                Logger.log("d", "Sent command to connect printer to Moonraker with current settings")
 
                 wait_for_printer = True
 
             if wait_for_printer:
                 self._waiting_message = Message(
-                    i18n_catalog.i18nc("@info:status", "Waiting for OctoPrint to connect to the printer..."),
-                    title=i18n_catalog.i18nc("@label", "OctoPrint"),
+                    i18n_catalog.i18nc("@info:status", "Waiting for Moonraker to connect to the printer..."),
+                    title=i18n_catalog.i18nc("@label", "Moonraker"),
                     progress=-1, lifetime=0, dismissable=False, use_inactivity_timer=False
                 )
                 self._waiting_message.addAction(
@@ -472,17 +472,17 @@ class OctoPrintOutputDevice(NetworkedPrinterOutputDevice):
             Logger.log("d", "Tried starting a print, but current state is %s" % self.activePrinter.state)
             error_string = ""
             if not self._auto_print:
-                # Allow queueing the job even if OctoPrint is currently busy if autoprinting is disabled
+                # Allow queueing the job even if Moonraker is currently busy if autoprinting is disabled
                 pass
             elif self.activePrinter.state == "offline":
                 error_string = i18n_catalog.i18nc("@info:status", "The printer is offline. Unable to start a new job.")
             else:
-                error_string = i18n_catalog.i18nc("@info:status", "OctoPrint is busy. Unable to start a new job.")
+                error_string = i18n_catalog.i18nc("@info:status", "Moonraker is busy. Unable to start a new job.")
 
             if error_string:
                 if self._error_message:
                     self._error_message.hide()
-                self._error_message = Message(error_string, title=i18n_catalog.i18nc("@label", "OctoPrint error"))
+                self._error_message = Message(error_string, title=i18n_catalog.i18nc("@label", "Moonraker error"))
                 self._error_message.addAction(
                     "queue", i18n_catalog.i18nc("@action:button", "Queue job"), "",
                     i18n_catalog.i18nc("@action:tooltip", "Queue this print job so it can be printed later")
@@ -586,7 +586,7 @@ class OctoPrintOutputDevice(NetworkedPrinterOutputDevice):
             self._select_and_print_handled_in_upload = True
 
             if not self._forced_queue:
-                # tell OctoPrint to start the print when there is no reason to delay doing so
+                # tell Moonraker to start the print when there is no reason to delay doing so
                 if self._auto_select or self._auto_print:
                     post_parts.append(self._createFormPart("name=\"select\"", b"true", "text/plain"))
                 if self._auto_print:
@@ -643,12 +643,12 @@ class OctoPrintOutputDevice(NetworkedPrinterOutputDevice):
     def _sendQueuedGcode(self) -> None:
         if self._queued_gcode_commands:
             self._sendCommandToApi("printer/command", self._queued_gcode_commands)
-            Logger.log("d", "Sent gcode command to OctoPrint instance: %s", self._queued_gcode_commands)
+            Logger.log("d", "Sent gcode command to Moonraker instance: %s", self._queued_gcode_commands)
             self._queued_gcode_commands = [] # type: List[str]
 
     def _sendJobCommand(self, command: str) -> None:
         self._sendCommandToApi("job", command)
-        Logger.log("d", "Sent job command to OctoPrint instance: %s", command)
+        Logger.log("d", "Sent job command to Moonraker instance: %s", command)
 
     def _sendCommandToApi(self, end_point: str, commands: Union[Dict[str, Any], str, List[str]]) -> None:
         if isinstance(commands, dict):
@@ -681,14 +681,13 @@ class OctoPrintOutputDevice(NetworkedPrinterOutputDevice):
         if not http_status_code:
             # Received no or empty reply
             return
-        Logger.log('d', reply.url().toString())
         if reply.operation() == QNetworkAccessManager.GetOperation:
             if self._api_prefix + "printerprofiles" in reply.url().toString():
                 if http_status_code == 200:
                     try:
                         json_data = json.loads(bytes(reply.readAll()).decode("utf-8"))
                     except json.decoder.JSONDecodeError:
-                        Logger.log("w", "Received invalid JSON from octoprint instance.")
+                        Logger.log("w", "Received invalid JSON from moonraker instance.")
                         json_data = {}
 
                     for profile_id in json_data["profiles"]:
@@ -709,11 +708,11 @@ class OctoPrintOutputDevice(NetworkedPrinterOutputDevice):
                     Logger.log("w", "Instance does not report printerprofiles with provided API key")
                     return
 
-            elif self._api_prefix + "printer" in reply.url().toString():  # Status update from /printer.
+            elif self._api_prefix + "printer/objects/query?heaters&virtual_sdcard&print_stats&display_status&toolhead" in reply.url().toString():  # Status update from /printer.
                 if not self._printers:
                     self._createPrinterList()
 
-                # An OctoPrint instance has a single printer.
+                # An Moonraker instance has a single printer.
                 printer = self._printers[0]
                 if not printer:
                     Logger.log("e", "There is no active printer")
@@ -725,15 +724,23 @@ class OctoPrintOutputDevice(NetworkedPrinterOutputDevice):
 
                     if not self.acceptsCommands:
                         self._setAcceptsCommands(True)
-                        self.setConnectionText(i18n_catalog.i18nc("@info:status", "Connected to OctoPrint on {0}").format(self._id))
+                        self.setConnectionText(i18n_catalog.i18nc("@info:status", "Connected to Moonraker on {0}").format(self._id))
 
                     if self._connection_state == UnifiedConnectionState.Connecting:
                         self.setConnectionState(cast(ConnectionState, UnifiedConnectionState.Connected))
                     try:
-                        json_data = json.loads(bytes(reply.readAll()).decode("utf-8"))
+                        json_data = json.loads(bytes(reply.readAll()).decode("utf-8"))['result']['status']
                     except json.decoder.JSONDecodeError:
-                        Logger.log("w", "Received invalid JSON from octoprint instance.")
+                        Logger.log("w", "Received invalid JSON from moonraker instance.")
                         json_data = {}
+                    #Logger.log('d', json_data)
+
+                    if printer.activePrintJob is None:
+                        print_job = PrintJobOutputModel(output_controller=self._output_controller)
+                        printer.updateActivePrintJob(print_job)
+                    else:
+                        print_job = printer.activePrintJob
+
 
                     if "temperature" in json_data:
                         if not self._number_of_extruders_set:
@@ -772,26 +779,60 @@ class OctoPrintOutputDevice(NetworkedPrinterOutputDevice):
                             printer.updateBedTemperature(-1)
                             printer.updateTargetBedTemperature(0)
 
+                    #standby", "printing", "paused", "complete", or "error"
                     printer_state = "offline"
-                    if "state" in json_data:
-                        flags = json_data["state"]["flags"]
-                        if flags["error"] or flags["closedOrError"]:
-                            printer_state = "error"
-                        elif flags["paused"] or flags["pausing"]:
-                            printer_state = "paused"
-                        elif flags["printing"]:
-                            printer_state = "printing"
-                        elif flags["cancelling"]:
-                            printer_state = "aborted"
-                        elif flags["ready"] or flags["operational"]:
-                            printer_state = "idle"
+                    if "print_stats" in json_data:
+                        state = json_data["print_stats"]["state"]
+                        Logger.log('d', state)
+
+                        if not isinstance(state, str):
+                            Logger.log("e", "Encountered non-string printjob state: %s" % state)
+                        elif state.startswith("error"):
+                            print_job_state = "error"
+                        elif state == "paused":
+                            print_job_state = "paused"
+                        elif state.startswith("printing"):
+                            print_job_state = "printing"
+                        elif state == "Cancelling":
+                            print_job_state = "abort"
+                        elif state == "standby":
+                            print_job_state = "ready"
+                            printer.updateState("idle")
+                        elif state == "complete":
+                            print_job_state = "ready"
+                            printer.updateState("idle")
                         else:
-                            Logger.log("w", "Encountered unexpected printer state flags: %s" % flags)
-                    printer.updateState(printer_state)
+                            Logger.log("w", "Encountered unexpected printjob state: %s" % state)
+                    print_job.updateState(print_job_state)
+
+                    print_time = json_data["print_stats"]["print_duration"]
+                    completion = json_data["print_stats"]["total_duration"]
+
+                    Logger.log('d', print_time)
+
+                    if print_time:
+                        print_job.updateTimeElapsed(print_time)
+
+                        if completion: # not 0 or None or ""
+                            print_job.updateTimeTotal(print_time / (completion / 100))
+                        else:
+                            print_job.updateTimeTotal(0)
+                    else:
+                        print_job.updateTimeElapsed(0)
+                        print_job.updateTimeTotal(0)
+
+                    print_job.updateName(json_data["print_stats"]["filename"])
+                    
+                    if self._waiting_for_printer and printer.state == "idle":
+                        self._waiting_for_printer = False
+                        if self._waiting_message:
+                            self._waiting_message.hide()
+                        self._waiting_message = None
+                        self._sendPrintJob()
 
                 elif http_status_code == 401 or http_status_code == 403:
                     self._setOffline(printer, i18n_catalog.i18nc(
-                        "@info:status", "OctoPrint on {0} does not allow access to the printer state").format(self._id)
+                        "@info:status", "Moonraker on {0} does not allow access to the printer state").format(self._id)
                     )
                     return
 
@@ -800,14 +841,14 @@ class OctoPrintOutputDevice(NetworkedPrinterOutputDevice):
                         self.setConnectionState(cast(ConnectionState, UnifiedConnectionState.Connected))
 
                     self._setOffline(printer, i18n_catalog.i18nc(
-                        "@info:status", "The printer connected to OctoPrint on {0} is not operational").format(self._id)
+                        "@info:status", "The printer connected to Moonraker on {0} is not operational").format(self._id)
                     )
                     return
 
                 elif http_status_code == 502 or http_status_code == 503:
                     Logger.log("w", "Received an error status code: %d", http_status_code)
                     self._setOffline(printer, i18n_catalog.i18nc(
-                        "@info:status", "OctoPrint on {0} is not running").format(self._id)
+                        "@info:status", "Moonraker on {0} is not running").format(self._id)
                     )
                     return
 
@@ -818,127 +859,127 @@ class OctoPrintOutputDevice(NetworkedPrinterOutputDevice):
                 if update_pace != self._update_timer.interval():
                     self._update_timer.setInterval(update_pace)
 
-            elif self._api_prefix + "job" in reply.url().toString():  # Status update from /job:
-                if not self._printers or not self._printers[0]:
-                    return  # Ignore the data for now, we don't have info about a printer yet.
-                printer = self._printers[0]
+            # elif self._api_prefix + "printer/objects/query?heaters&virtual_sdcard&print_stats&display_status&toolhead" in reply.url().toString():  # Status update from /job:
+            #     if not self._printers or not self._printers[0]:
+            #         return  # Ignore the data for now, we don't have info about a printer yet.
+            #     printer = self._printers[0]
 
+            #     if http_status_code == 200:
+            #         try:
+            #             json_data = json.loads(bytes(reply.readAll()).decode("utf-8"))
+            #         except json.decoder.JSONDecodeError:
+            #             Logger.log("w", "Received invalid JSON from moonraker instance.")
+            #             json_data = {}
+
+            #         if printer.activePrintJob is None:
+            #             print_job = PrintJobOutputModel(output_controller=self._output_controller)
+            #             printer.updateActivePrintJob(print_job)
+            #         else:
+            #             print_job = printer.activePrintJob
+
+            #         print_job_state = "offline"
+            #         if "state" in json_data:
+            #             state = json_data["state"]
+            #             if not isinstance(state, str):
+            #                 Logger.log("e", "Encountered non-string printjob state: %s" % state)
+            #             elif state.startswith("Error"):
+            #                 print_job_state = "error"
+            #             elif state == "Pausing":
+            #                 print_job_state = "pausing"
+            #             elif state == "Paused":
+            #                 print_job_state = "paused"
+            #             elif state.startswith("Printing"):
+            #                 print_job_state = "printing"
+            #             elif state == "Cancelling":
+            #                 print_job_state = "abort"
+            #             elif state == "Operational":
+            #                 print_job_state = "ready"
+            #                 printer.updateState("idle")
+            #             elif state.startswith("Starting") or state == "Connecting" or state == "Sending file to SD":
+            #                 print_job_state = "pre_print"
+            #             elif state.startswith("Offline"):
+            #                 print_job_state = "offline"
+            #             else:
+            #                 Logger.log("w", "Encountered unexpected printjob state: %s" % state)
+            #         print_job.updateState(print_job_state)
+
+            #         print_time = json_data["progress"]["printTime"]
+            #         completion = json_data["progress"]["completion"]
+            #         if print_time:
+            #             print_job.updateTimeElapsed(print_time)
+
+            #             print_time_left = json_data["progress"]["printTimeLeft"]
+            #             if print_time_left: # not 0 or None or ""
+            #                 print_job.updateTimeTotal(print_time + print_time_left)
+            #             elif completion: # not 0 or None or ""
+            #                 print_job.updateTimeTotal(print_time / (completion / 100))
+            #             else:
+            #                 print_job.updateTimeTotal(0)
+            #         else:
+            #             print_job.updateTimeElapsed(0)
+            #             print_job.updateTimeTotal(0)
+
+            #         if completion and print_job_state == "pre_print": # completion not not 0 or None or "", state "Sending file to SD"
+            #             if not self._progress_message:
+            #                 self._progress_message = Message(
+            #                     i18n_catalog.i18nc("@info:status", "Streaming file to the printer SD card"),
+            #                     0, False, -1, title=i18n_catalog.i18nc("@label", "Moonraker")
+            #                 )
+            #                 self._progress_message.show()
+            #             if completion < 100:
+            #                 self._progress_message.setProgress(completion)
+            #         else:
+            #             if self._progress_message and self._progress_message.getText().startswith(
+            #                 i18n_catalog.i18nc("@info:status", "Streaming file to the printer SD card")
+            #             ):
+            #                 self._progress_message.hide()
+            #                 self._progress_message = None # type:Optional[Message]
+
+            #         print_job.updateName(json_data["job"]["file"]["name"])
+
+            #         if self._waiting_for_printer and printer.state == "idle":
+            #             self._waiting_for_printer = False
+            #             if self._waiting_message:
+            #                 self._waiting_message.hide()
+            #             self._waiting_message = None
+            #             self._sendPrintJob()
+
+            #     elif http_status_code == 401 or http_status_code == 403:
+            #         self._setOffline(printer, i18n_catalog.i18nc(
+            #             "@info:status", "Moonraker on {0} does not allow access to the job state").format(self._id)
+            #         )
+            #         return
+
+            #     elif http_status_code == 502 or http_status_code == 503:
+            #         Logger.log("w", "Received an error status code: %d", http_status_code)
+            #         self._setOffline(printer, i18n_catalog.i18nc(
+            #             "@info:status", "Moonraker on {0} is not running").format(self._id)
+            #         )
+            #         return
+
+            #     else:
+            #         pass  # See generic error handler below
+
+            elif self._api_prefix + "settings" in reply.url().toString():  # Moonraker settings dump from /settings:
                 if http_status_code == 200:
                     try:
                         json_data = json.loads(bytes(reply.readAll()).decode("utf-8"))
                     except json.decoder.JSONDecodeError:
-                        Logger.log("w", "Received invalid JSON from octoprint instance.")
-                        json_data = {}
-
-                    if printer.activePrintJob is None:
-                        print_job = PrintJobOutputModel(output_controller=self._output_controller)
-                        printer.updateActivePrintJob(print_job)
-                    else:
-                        print_job = printer.activePrintJob
-
-                    print_job_state = "offline"
-                    if "state" in json_data:
-                        state = json_data["state"]
-                        if not isinstance(state, str):
-                            Logger.log("e", "Encountered non-string printjob state: %s" % state)
-                        elif state.startswith("Error"):
-                            print_job_state = "error"
-                        elif state == "Pausing":
-                            print_job_state = "pausing"
-                        elif state == "Paused":
-                            print_job_state = "paused"
-                        elif state.startswith("Printing"):
-                            print_job_state = "printing"
-                        elif state == "Cancelling":
-                            print_job_state = "abort"
-                        elif state == "Operational":
-                            print_job_state = "ready"
-                            printer.updateState("idle")
-                        elif state.startswith("Starting") or state == "Connecting" or state == "Sending file to SD":
-                            print_job_state = "pre_print"
-                        elif state.startswith("Offline"):
-                            print_job_state = "offline"
-                        else:
-                            Logger.log("w", "Encountered unexpected printjob state: %s" % state)
-                    print_job.updateState(print_job_state)
-
-                    print_time = json_data["progress"]["printTime"]
-                    completion = json_data["progress"]["completion"]
-                    if print_time:
-                        print_job.updateTimeElapsed(print_time)
-
-                        print_time_left = json_data["progress"]["printTimeLeft"]
-                        if print_time_left: # not 0 or None or ""
-                            print_job.updateTimeTotal(print_time + print_time_left)
-                        elif completion: # not 0 or None or ""
-                            print_job.updateTimeTotal(print_time / (completion / 100))
-                        else:
-                            print_job.updateTimeTotal(0)
-                    else:
-                        print_job.updateTimeElapsed(0)
-                        print_job.updateTimeTotal(0)
-
-                    if completion and print_job_state == "pre_print": # completion not not 0 or None or "", state "Sending file to SD"
-                        if not self._progress_message:
-                            self._progress_message = Message(
-                                i18n_catalog.i18nc("@info:status", "Streaming file to the printer SD card"),
-                                0, False, -1, title=i18n_catalog.i18nc("@label", "OctoPrint")
-                            )
-                            self._progress_message.show()
-                        if completion < 100:
-                            self._progress_message.setProgress(completion)
-                    else:
-                        if self._progress_message and self._progress_message.getText().startswith(
-                            i18n_catalog.i18nc("@info:status", "Streaming file to the printer SD card")
-                        ):
-                            self._progress_message.hide()
-                            self._progress_message = None # type:Optional[Message]
-
-                    print_job.updateName(json_data["job"]["file"]["name"])
-
-                    if self._waiting_for_printer and printer.state == "idle":
-                        self._waiting_for_printer = False
-                        if self._waiting_message:
-                            self._waiting_message.hide()
-                        self._waiting_message = None
-                        self._sendPrintJob()
-
-                elif http_status_code == 401 or http_status_code == 403:
-                    self._setOffline(printer, i18n_catalog.i18nc(
-                        "@info:status", "OctoPrint on {0} does not allow access to the job state").format(self._id)
-                    )
-                    return
-
-                elif http_status_code == 502 or http_status_code == 503:
-                    Logger.log("w", "Received an error status code: %d", http_status_code)
-                    self._setOffline(printer, i18n_catalog.i18nc(
-                        "@info:status", "OctoPrint on {0} is not running").format(self._id)
-                    )
-                    return
-
-                else:
-                    pass  # See generic error handler below
-
-            elif self._api_prefix + "settings" in reply.url().toString():  # OctoPrint settings dump from /settings:
-                if http_status_code == 200:
-                    try:
-                        json_data = json.loads(bytes(reply.readAll()).decode("utf-8"))
-                    except json.decoder.JSONDecodeError:
-                        Logger.log("w", "Received invalid JSON from octoprint instance.")
+                        Logger.log("w", "Received invalid JSON from moonraker instance.")
                         json_data = {}
 
                     self.parseSettingsData(json_data)
 
-            elif self._api_prefix + "version" in reply.url().toString():  # OctoPrint & API version
+            elif self._api_prefix + "version" in reply.url().toString():  # Moonraker & API version
                 if http_status_code == 200:
                     try:
                         json_data = json.loads(bytes(reply.readAll()).decode("utf-8"))
                     except json.decoder.JSONDecodeError:
-                        Logger.log("w", "Received invalid JSON from octoprint instance.")
+                        Logger.log("w", "Received invalid JSON from moonraker instance.")
                         json_data = {}
 
                     if "server" in json_data:
-                        self._octoprint_version = json_data["server"]
+                        self._moonraker_version = json_data["server"]
                         self.additionalDataChanged.emit()
 
                 elif http_status_code == 404:
@@ -955,7 +996,7 @@ class OctoPrintOutputDevice(NetworkedPrinterOutputDevice):
                     try:
                         json_data = json.loads(bytes(reply.readAll()).decode("utf-8"))
                     except json.decoder.JSONDecodeError:
-                        Logger.log("w", "Received invalid JSON from octoprint instance.")
+                        Logger.log("w", "Received invalid JSON from moonraker instance.")
                         json_data = {}
 
                     if "gcodeAnalysis" in json_data and "progress" in json_data["gcodeAnalysis"]:
@@ -976,15 +1017,15 @@ class OctoPrintOutputDevice(NetworkedPrinterOutputDevice):
         elif reply.operation() == QNetworkAccessManager.PostOperation:
             if self._api_prefix + "files" in reply.url().toString():  # Result from /files command to start a printjob:
                 if http_status_code == 204:
-                    Logger.log("d", "OctoPrint file command accepted")
+                    Logger.log("d", "Moonraker file command accepted")
 
                 elif http_status_code == 401 or http_status_code == 403:
-                    error_string = i18n_catalog.i18nc("@info:error", "You are not allowed to start print jobs on OctoPrint with the configured API key.")
+                    error_string = i18n_catalog.i18nc("@info:error", "You are not allowed to start print jobs on Moonraker with the configured API key.")
                     self._showErrorMessage(error_string)
                     return
 
                 elif http_status_code == 404 and "files/sdcard/" in reply.url().toString():
-                    Logger.log("d", "OctoPrint reports an 404 not found error after uploading to SD-card, but we ignore that")
+                    Logger.log("d", "Moonraker reports an 404 not found error after uploading to SD-card, but we ignore that")
                     return
 
                 else:
@@ -992,10 +1033,10 @@ class OctoPrintOutputDevice(NetworkedPrinterOutputDevice):
 
             elif self._api_prefix + "job" in reply.url().toString():  # Result from /job command (eg start/pause):
                 if http_status_code == 204:
-                    Logger.log("d", "OctoPrint job command accepted")
+                    Logger.log("d", "Moonraker job command accepted")
 
                 elif http_status_code == 401 or http_status_code == 403:
-                    error_string = i18n_catalog.i18nc("@info:error", "You are not allowed to control print jobs on OctoPrint with the configured API key.")
+                    error_string = i18n_catalog.i18nc("@info:error", "You are not allowed to control print jobs on Moonraker with the configured API key.")
                     self._showErrorMessage(error_string)
                     return
 
@@ -1004,10 +1045,10 @@ class OctoPrintOutputDevice(NetworkedPrinterOutputDevice):
 
             elif self._api_prefix + "printer/command" in reply.url().toString():  # Result from /printer/command (gcode statements):
                 if http_status_code == 204:
-                    Logger.log("d", "OctoPrint gcode command(s) accepted")
+                    Logger.log("d", "Moonraker gcode command(s) accepted")
 
                 elif http_status_code == 401 or http_status_code == 403:
-                    error_string = i18n_catalog.i18nc("@info:error", "You are not allowed to send gcode commands to OctoPrint with the configured API key.")
+                    error_string = i18n_catalog.i18nc("@info:error", "You are not allowed to send gcode commands to Moonraker with the configured API key.")
                     self._showErrorMessage(error_string)
                     return
 
@@ -1016,10 +1057,10 @@ class OctoPrintOutputDevice(NetworkedPrinterOutputDevice):
 
             elif self._api_prefix + "connection/connect" in reply.url().toString():  # Result from /connection/connect command (eg start/pause):
                 if http_status_code == 204:
-                    Logger.log("d", "OctoPrint connection command accepted")
+                    Logger.log("d", "Moonraker connection command accepted")
 
                 elif http_status_code == 401 or http_status_code == 403:
-                    error_string = i18n_catalog.i18nc("@info:error", "You are not allowed to control printer connections on OctoPrint with the configured API key.")
+                    error_string = i18n_catalog.i18nc("@info:error", "You are not allowed to control printer connections on Moonraker with the configured API key.")
                     self._showErrorMessage(error_string)
                     return
 
@@ -1027,11 +1068,11 @@ class OctoPrintOutputDevice(NetworkedPrinterOutputDevice):
                     pass  # See generic error handler below
 
         else:
-            Logger.log("d", "OctoPrintOutputDevice got an unhandled operation %s", reply.operation())
+            Logger.log("d", "MoonrakerOutputDevice got an unhandled operation %s", reply.operation())
 
         if http_status_code >= 400:
             if http_status_code == 401 or http_status_code == 403:
-                error_string = i18n_catalog.i18nc("@info:error", "You are not allowed to access OctoPrint with the configured API key.")
+                error_string = i18n_catalog.i18nc("@info:error", "You are not allowed to access Moonraker with the configured API key.")
             else:
                 # Received another error reply
                 error_string = bytes(reply.readAll()).decode("utf-8")
@@ -1039,7 +1080,7 @@ class OctoPrintOutputDevice(NetworkedPrinterOutputDevice):
                     error_string = reply.attribute(QNetworkRequest.HttpReasonPhraseAttribute)
 
             self._showErrorMessage(error_string)
-            Logger.log("e", "OctoPrintOutputDevice got an error while accessing %s", reply.url().toString())
+            Logger.log("e", "MoonrakerOutputDevice got an error while accessing %s", reply.url().toString())
             Logger.log("e", error_string)
 
     def _onUploadProgress(self, bytes_sent: int, bytes_total: int) -> None:
@@ -1059,8 +1100,8 @@ class OctoPrintOutputDevice(NetworkedPrinterOutputDevice):
             else:
                 self._progress_message.hide()
                 self._progress_message = Message(
-                    i18n_catalog.i18nc("@info:status", "Storing data on OctoPrint"),
-                    0, False, -1, title=i18n_catalog.i18nc("@label", "OctoPrint")
+                    i18n_catalog.i18nc("@info:status", "Storing data on Moonraker"),
+                    0, False, -1, title=i18n_catalog.i18nc("@label", "Moonraker")
                 )
                 self._progress_message.show()
         else:
@@ -1076,7 +1117,7 @@ class OctoPrintOutputDevice(NetworkedPrinterOutputDevice):
         http_status_code = reply.attribute(QNetworkRequest.HttpStatusCodeAttribute)
         error_string = ""
         if http_status_code == 401 or http_status_code == 403:
-            error_string = i18n_catalog.i18nc("@info:error", "You are not allowed to upload files to OctoPrint with the configured API key.")
+            error_string = i18n_catalog.i18nc("@info:error", "You are not allowed to upload files to Moonraker with the configured API key.")
 
         elif http_status_code == 409:
             if "files/sdcard" in reply.url().toString():
@@ -1091,12 +1132,12 @@ class OctoPrintOutputDevice(NetworkedPrinterOutputDevice):
 
         if error_string:
             self._showErrorMessage(error_string)
-            Logger.log("e", "OctoPrintOutputDevice got an %d error uploading to %s", http_status_code, reply.url().toString())
+            Logger.log("e", "MoonrakerOutputDevice got an %d error uploading to %s", http_status_code, reply.url().toString())
             Logger.log("e", error_string)
             return
 
         location_url = reply.header(QNetworkRequest.LocationHeader)
-        Logger.log("d", "Resource created on OctoPrint instance: %s", location_url.toString())
+        Logger.log("d", "Resource created on Moonraker instance: %s", location_url.toString())
 
         end_point = location_url.toString().split(self._api_prefix, 1)[1]
         if self._transfer_as_ufp and end_point.endswith(".ufp"):
@@ -1110,15 +1151,15 @@ class OctoPrintOutputDevice(NetworkedPrinterOutputDevice):
         if self._forced_queue or not self._auto_print:
             if location_url:
                 file_name = location_url.fileName()
-                message = Message(i18n_catalog.i18nc("@info:status", "Saved to OctoPrint as {0}").format(file_name))
+                message = Message(i18n_catalog.i18nc("@info:status", "Saved to Moonraker as {0}").format(file_name))
             else:
-                message = Message(i18n_catalog.i18nc("@info:status", "Saved to OctoPrint"))
-            message.setTitle(i18n_catalog.i18nc("@label", "OctoPrint"))
+                message = Message(i18n_catalog.i18nc("@info:status", "Saved to Moonraker"))
+            message.setTitle(i18n_catalog.i18nc("@label", "Moonraker"))
             message.addAction(
-                "open_browser", i18n_catalog.i18nc("@action:button", "OctoPrint..."), "globe",
-                i18n_catalog.i18nc("@info:tooltip", "Open the OctoPrint web interface")
+                "open_browser", i18n_catalog.i18nc("@action:button", "Moonraker..."), "globe",
+                i18n_catalog.i18nc("@info:tooltip", "Open the Moonraker web interface")
             )
-            message.actionTriggered.connect(self._openOctoPrint)
+            message.actionTriggered.connect(self._openMoonraker)
             message.show()
 
             if self._auto_print or self._auto_select:
@@ -1130,8 +1171,8 @@ class OctoPrintOutputDevice(NetworkedPrinterOutputDevice):
                 return
 
             self._waiting_message = Message(
-                i18n_catalog.i18nc("@info:status", "Waiting for OctoPrint to complete Gcode analysis..."),
-                title=i18n_catalog.i18nc("@label", "OctoPrint"),
+                i18n_catalog.i18nc("@info:status", "Waiting for Moonraker to complete Gcode analysis..."),
+                title=i18n_catalog.i18nc("@label", "Moonraker"),
                 progress=-1, lifetime=0, dismissable=False, use_inactivity_timer=False
             )
             self._waiting_message.addAction(
@@ -1185,7 +1226,7 @@ class OctoPrintOutputDevice(NetworkedPrinterOutputDevice):
                         self._ufp_plugin_version = Version(plugin_data["UltimakerFormatPackage"]["installed_version"])
                     except KeyError:
                         self._ufp_plugin_version = Version(0)
-                        Logger.log("d", "OctoPrint-UltimakerFormatPackage plugin version < 0.1.7")
+                        Logger.log("d", "Moonraker-UltimakerFormatPackage plugin version < 0.1.7")
 
             if "multicam" in plugin_data:
                 webcam_data = plugin_data["multicam"]["multicam_profiles"]
@@ -1221,10 +1262,10 @@ class OctoPrintOutputDevice(NetworkedPrinterOutputDevice):
     def _showErrorMessage(self, error_string: str) -> None:
         if self._error_message:
             self._error_message.hide()
-        self._error_message = Message(error_string, title=i18n_catalog.i18nc("@label", "OctoPrint error"))
+        self._error_message = Message(error_string, title=i18n_catalog.i18nc("@label", "Moonraker error"))
         self._error_message.show()
 
-    def _openOctoPrint(self, message: Message, action_id: str) -> None:
+    def _openMoonraker(self, message: Message, action_id: str) -> None:
         QDesktopServices.openUrl(QUrl(self._base_url))
 
     def _createEmptyRequest(self, target: str, content_type: Optional[str] = "application/json") -> QNetworkRequest:
