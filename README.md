@@ -3,11 +3,11 @@
 Fork of the Octoprint plugin for Mainsail / Fluidd 
 
 Need to be done :
-[x] add/remove Moonraker apis
-[x] Upload file to Moonraker 
-[ ] Basic monitoring ( remaining time / status / filename )
-[ ] Webcam
-[ ] Controls, homing
+- [x] add/remove Moonraker apis
+- [x] Upload file to Moonraker 
+- [ ] Basic monitoring ( remaining time / status / filename )
+- [ ] Webcam
+- [ ] Controls, homing
 
 ## Install:
 Download or clone the repository into `[Cura configuration folder]/plugins/MoonrakerPlugin`.
