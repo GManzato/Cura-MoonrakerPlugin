@@ -33,7 +33,7 @@ catalog = i18nCatalog("cura")
 
 class DiscoverOctoPrintAction(MachineAction):
     def __init__(self, parent: QObject = None) -> None:
-        super().__init__("DiscoverOctoPrintAction", catalog.i18nc("@action", "Connect OctoPrint"))
+        super().__init__("DiscoverOctoPrintAction", catalog.i18nc("@action", "Connect Moonraker"))
 
         self._qml_url = os.path.join("qml", "DiscoverOctoPrintAction.qml")
 
@@ -264,7 +264,7 @@ class DiscoverOctoPrintAction(MachineAction):
 
             ## Request 'settings' dump
             settings_request = self._createRequest(
-                QUrl(base_url + "api/settings"),
+                QUrl(base_url + "/printer/info"),
                 basic_auth_username, basic_auth_password
             )
             settings_request.setRawHeader(b"X-Api-Key", api_key.encode())
@@ -501,7 +501,7 @@ class DiscoverOctoPrintAction(MachineAction):
                 if http_status_code != 202:
                     self._appkey_request = None # type: Optional[QNetworkRequest]
 
-            if "api/settings" in reply.url().toString():  # OctoPrint settings dump from /settings:
+            if "printer/info" in reply.url().toString():  # OctoPrint settings dump from /settings:
                 self._instance_in_error = False
 
                 if http_status_code == 200:

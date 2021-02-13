@@ -121,7 +121,7 @@ class OctoPrintOutputDevice(NetworkedPrinterOutputDevice):
             plugin_version
         )) # NetworkedPrinterOutputDevice defines this as string, so we encode this later
 
-        self._api_prefix = "api/"
+        self._api_prefix = ""
         self._api_key = b""
 
         self._protocol = "https" if properties.get(b'useHttps') == b"true" else "http"
@@ -196,7 +196,7 @@ class OctoPrintOutputDevice(NetworkedPrinterOutputDevice):
 
         self._output_controller = OctoPrintOutputController(self)
 
-        self._polling_end_points = ["printer", "job"]
+        self._polling_end_points = ["printer/objects/query?webhooks&virtual_sdcard&print_stats"]
 
     @property
     def _store_on_sd(self) -> bool:
@@ -329,7 +329,7 @@ class OctoPrintOutputDevice(NetworkedPrinterOutputDevice):
 
         self._waiting_for_printer = False
         self._waiting_for_analysis = False
-        self._polling_end_points = [point for point in self._polling_end_points if not point.startswith("files/")]
+        self._polling_end_points = [point for point in self._polling_end_points if not point.startswith("/server/files/list?root=gcodes")]
 
     ##  Start requesting data from the instance
     def connect(self) -> None:
@@ -348,7 +348,7 @@ class OctoPrintOutputDevice(NetworkedPrinterOutputDevice):
         ## Request 'settings' dump
         self.get("settings", self._onRequestFinished)
 
-        self.getAdditionalData()
+        # self.getAdditionalData()
 
     def getAdditionalData(self) -> None:
         if not self._api_key:
@@ -500,13 +500,13 @@ class OctoPrintOutputDevice(NetworkedPrinterOutputDevice):
         self._waiting_for_analysis = False
 
         for end_point in self._polling_end_points:
-            if "files/" in end_point:
+            if "/server/files/list?root=gcodes" in end_point:
                 break
-        if "files/" not in end_point:
-            Logger.log("e", "Could not find files/ endpoint")
+        if "/server/files/list?root=gcodes" not in end_point:
+            Logger.log("e", "Could not find /server/files/list?root=gcodes endpoint")
             return
 
-        self._polling_end_points = [point for point in self._polling_end_points if not point.startswith("files/")]
+        self._polling_end_points = [point for point in self._polling_end_points if not point.startswith("/server/files/")]
 
         if action_id == "print":
             self._selectAndPrint(end_point)
@@ -550,8 +550,8 @@ class OctoPrintOutputDevice(NetworkedPrinterOutputDevice):
                 pass
 
         self._progress_message = Message(
-            i18n_catalog.i18nc("@info:status", "Sending data to OctoPrint"),
-            title=i18n_catalog.i18nc("@label", "OctoPrint"),
+            i18n_catalog.i18nc("@info:status", "Sending data to Moonraker"),
+            title=i18n_catalog.i18nc("@label", "Moonraker"),
             progress=-1, lifetime=0, dismissable=False, use_inactivity_timer=False
         )
         self._progress_message.addAction(
@@ -602,9 +602,9 @@ class OctoPrintOutputDevice(NetworkedPrinterOutputDevice):
 
         try:
             ##  Post request + data
-            post_gcode_request = self._createEmptyRequest("files/" + destination, content_type="application/x-www-form-urlencoded")
+            post_gcode_request = self._createEmptyRequest("server/files/upload", content_type="application/x-www-form-urlencoded")
             self._post_gcode_reply = self.postFormWithParts(
-                "files/" + destination,
+                "server/files/upload",
                 post_parts,
                 on_finished=self._onUploadFinished,
                 on_progress=self._onUploadProgress
@@ -613,8 +613,8 @@ class OctoPrintOutputDevice(NetworkedPrinterOutputDevice):
         except Exception as e:
             self._progress_message.hide()
             self._error_message = Message(
-                i18n_catalog.i18nc("@info:status", "Unable to send data to OctoPrint."),
-                title=i18n_catalog.i18nc("@label", "OctoPrint error")
+                i18n_catalog.i18nc("@info:status", "Unable to send data to Moonraker."),
+                title=i18n_catalog.i18nc("@label", "Mooraker error")
             )
             self._error_message.show()
             Logger.log("e", "An exception occurred in network connection: %s" % str(e))
@@ -681,7 +681,7 @@ class OctoPrintOutputDevice(NetworkedPrinterOutputDevice):
         if not http_status_code:
             # Received no or empty reply
             return
-
+        Logger.log('d', reply.url().toString())
         if reply.operation() == QNetworkAccessManager.GetOperation:
             if self._api_prefix + "printerprofiles" in reply.url().toString():
                 if http_status_code == 200:
@@ -1014,34 +1014,6 @@ class OctoPrintOutputDevice(NetworkedPrinterOutputDevice):
                 else:
                     pass  # See generic error handler below
 
-            elif self._api_prefix + "login" in reply.url().toString():
-                if http_status_code == 200:
-                    try:
-                        json_data = json.loads(bytes(reply.readAll()).decode("utf-8"))
-                    except json.decoder.JSONDecodeError:
-                        Logger.log("w", "Received invalid JSON from octoprint instance.")
-                        json_data = {}
-
-                    if "name" in json_data:
-                        self._octoprint_user_name = json_data["name"]
-                    else:
-                        self._octoprint_user_name = i18n_catalog.i18nc("@label", "Anonymous user")
-                    self.additionalDataChanged.emit()
-
-                elif http_status_code == 404:
-                    Logger.log("w", "Instance does not support user authorization")
-                    self._octoprint_user_name = i18n_catalog.i18nc("@label", "Anonymous user")
-                    self.additionalDataChanged.emit()
-                    return
-
-                elif http_status_code == 401 or http_status_code == 403:
-                    self._octoprint_user_name = i18n_catalog.i18nc("@label", "Unknown user")
-                    self.additionalDataChanged.emit()
-
-                    error_string = i18n_catalog.i18nc("@info:error", "You are not allowed to access to OctoPrint with the configured API key.")
-                    self._showErrorMessage(error_string)
-                    return
-
             elif self._api_prefix + "connection/connect" in reply.url().toString():  # Result from /connection/connect command (eg start/pause):
                 if http_status_code == 204:
                     Logger.log("d", "OctoPrint connection command accepted")
@@ -1258,10 +1230,10 @@ class OctoPrintOutputDevice(NetworkedPrinterOutputDevice):
     def _createEmptyRequest(self, target: str, content_type: Optional[str] = "application/json") -> QNetworkRequest:
         request = QNetworkRequest(QUrl(self._api_url + target))
         request.setAttribute(QNetworkRequest.FollowRedirectsAttribute, True)
-
+        
         request.setRawHeader(b"X-Api-Key", self._api_key)
         request.setRawHeader(b"User-Agent", self._user_agent.encode())
-
+    
         if content_type is not None:
             request.setHeader(QNetworkRequest.ContentTypeHeader, content_type)
 
@@ -1269,9 +1241,6 @@ class OctoPrintOutputDevice(NetworkedPrinterOutputDevice):
         ssl_configuration = QSslConfiguration.defaultConfiguration()
         ssl_configuration.setPeerVerifyMode(QSslSocket.VerifyNone)
         request.setSslConfiguration(ssl_configuration)
-
-        if self._basic_auth_data:
-            request.setRawHeader(b"Authorization", self._basic_auth_data)
 
         return request
 

@@ -17,7 +17,7 @@ def getMetaData():
     return {}
 
 def register(app):
-    qmlRegisterType(NetworkMJPGImage.NetworkMJPGImage, "OctoPrintPlugin", 1, 0, "NetworkMJPGImage")
+    qmlRegisterType(NetworkMJPGImage.NetworkMJPGImage, "MoonrakerPrintPlugin", 1, 0, "NetworkMJPGImage")
 
     return {
         "output_device": OctoPrintOutputDevicePlugin.OctoPrintOutputDevicePlugin(),

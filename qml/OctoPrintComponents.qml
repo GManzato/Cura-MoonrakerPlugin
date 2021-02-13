@@ -20,8 +20,8 @@ Item
     {
         objectName: "openOctoPrintButton"
         height: UM.Theme.getSize("save_button_save_to_button").height
-        tooltip: catalog.i18nc("@info:tooltip", "Open the OctoPrint web interface")
-        text: catalog.i18nc("@action:button", "OctoPrint...")
+        tooltip: catalog.i18nc("@info:tooltip", "Open the Fluidd web interface")
+        text: catalog.i18nc("@action:button", "Fluidd...")
         style:
         {
             if(UM.Theme.styles.hasOwnProperty("print_setup_action_button")) {

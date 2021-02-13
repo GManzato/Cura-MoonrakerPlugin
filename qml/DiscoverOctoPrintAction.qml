@@ -71,7 +71,7 @@ Cura.MachineAction
             Label
             {
                 id: pageTitle
-                text: catalog.i18nc("@title", "Connect to OctoPrint")
+                text: catalog.i18nc("@title", "Connect to Moonraker")
                 wrapMode: Text.WordWrap
                 font.pointSize: 18
             }
@@ -92,7 +92,7 @@ Cura.MachineAction
             id: pageDescription
             width: parent.width
             wrapMode: Text.WordWrap
-            text: catalog.i18nc("@label", "Select your OctoPrint instance from the list below.")
+            text: catalog.i18nc("@label", "Select your Moonraker instance from the list below.")
         }
 
         Row

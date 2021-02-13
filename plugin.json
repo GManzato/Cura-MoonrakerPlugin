@@ -1,8 +1,8 @@
 {
-    "name": "OctoPrint connection",
-    "author": "fieldOfView",
-    "version": "3.5.18",
-    "description": "Enables networked printing and monitoring with OctoPrint",
+    "name": "Klipper Moonraker connection",
+    "author": "GManzato",
+    "version": "1",
+    "description": "Enables networked printing and monitoring with Fluidd or Mainsail using the Moonraker API for Klipper",
     "api": 5,
     "supported_sdk_versions": ["5.0.0", "6.0.0", "6.1.0", "6.2.0", "6.3.0", "7.0.0", "7.1.0", "7.2.0", "7.3.0", "7.4.0"],
     "i18n-catalog": "cura"
