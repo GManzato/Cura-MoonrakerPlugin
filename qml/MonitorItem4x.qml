@@ -6,7 +6,7 @@ import QtQuick.Controls 2.3
 
 import UM 1.3 as UM
 import Cura 1.0 as Cura
-import OctoPrintPlugin 1.0 as OctoPrintPlugin
+import MoonrakerPlugin 1.0 as MoonrakerPlugin
 
 Component
 {
@@ -17,7 +17,7 @@ Component
         property var webcamsModel: OutputDevice != null ? OutputDevice.webcamsModel : null
         property int activeIndex: 0
 
-        OctoPrintPlugin.NetworkMJPGImage
+        MoonrakerPlugin.NetworkMJPGImage
         {
             id: cameraImage
             visible: OutputDevice != null ? OutputDevice.showCamera : false
